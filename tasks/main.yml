@@ -1,0 +1,73 @@
+---
+
+- name: Enable sudo without password for admin users in group %sudo
+  become: yes
+  lineinfile:
+    dest: /etc/sudoers
+    state: present
+    regexp: '^%{{ server_sudo_group }}'
+    line: "%{{ server_sudo_group }} ALL=(ALL) NOPASSWD: ALL"
+    validate: 'visudo -cf %s'
+
+- name: Create default admin accounts
+  become: yes
+  user:
+    state: present
+    append: yes
+    createhome: yes
+    generate_ssh_key: yes
+    name: "{{ item.name }}"
+    groups: "{{ item.groups | default(omit) }}"
+    home: "/home/{{ item.name }}"
+    password: "{{ item.password | default(omit) }}"
+    shell: "{{ item.shell | default(omit) }}"
+  with_items:
+    - "{{ server_users }}"
+
+- name: Delete users
+  become: yes
+  user:
+    state: absent
+    name: "{{ item }}"
+  with_items:
+    - "{{ server_users_removed }}"
+
+# - name: Copy deploy key for server_admin_user
+#   copy:
+#     src: "deploy_key/{{ item.name }}"
+#     dest: "/home/{{ server_admin_user }}/.ssh/{{ item.name }}"
+#     owner: "{{ server_admin_user }}"
+#     group: "{{ server_admin_user }}"
+#     mode: "{{ item.mode }}"
+#   with_items:
+#     - name: git-deploy
+#       mode: "0600"
+#     - name: git-deploy.pub
+#       mode: "0640"
+
+- name: Add ssh pub keys to user
+  become: yes
+  authorized_key:
+    state: present
+    manage_dir: yes
+    key: "{{ lookup('file', '../files/keys/' + item.name + '.pub') }}"
+    user: "{{ item.name }}"
+  with_items:
+    - "{{ server_users }}"
+
+- name: Add ssh pub keys to server_admin_user
+  become: yes
+  authorized_key:
+    state: present
+    manage_dir: yes
+    key: "{{ lookup('file', item) }}"
+    user: "{{ server_admin_user }}"
+  with_fileglob:
+    - ../files/keys/*.pub
+
+- name: Change root password
+  become: yes
+  user:
+    state: present
+    name: root
+    password: "{{ server_root_password }}"

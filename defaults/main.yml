@@ -1,0 +1,9 @@
+---
+server_admin_user: ubuntu
+server_admin_password: ""
+
+server_users:
+server_users_removed: []
+server_root_password: ""
+
+set_custom_user_env: no
